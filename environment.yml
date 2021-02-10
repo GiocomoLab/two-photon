@@ -12,7 +12,8 @@ dependencies:
   - python=3.8.5
   - scikit-image=0.17.2
   - scipy=1.5.2
-  - tifffile=2020.7.22
+  - seaborn=0.11.1
+  - tifffile=2021.2.1
   - yapf
   - pip:
       - suite2p==0.7.5
