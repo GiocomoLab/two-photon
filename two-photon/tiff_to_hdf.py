@@ -2,6 +2,7 @@
 
 import argparse
 import logging
+import os
 import pathlib
 
 import metadata
@@ -14,6 +15,7 @@ HDF5_KEY = '/data'  # Default key name in Suite2P.
 
 def tiff_to_hdf(inprefix, channel, outdir):
     """Convert a directory of tiff files ripped from Bruker into a single HDF5 file."""
+    os.makedirs(outdir, exist_ok=True)
     mdata = metadata.read(inprefix, outdir)
     data = tiffdata.read(inprefix, mdata['size'], mdata['layout'], channel)
     fname_data = outdir / 'data.hdf'
@@ -29,11 +31,11 @@ if __name__ == "__main__":
                         type=pathlib.Path,
                         required=True,
                         help='Prefix for the xml and tiff files used.')
-    parser.add_argument('--outhdf',
+    parser.add_argument('--outdir',
                         type=pathlib.Path,
                         required=True,
-                        help='Output HDF5 filename.')
-    parser.add_argument('--channel', type=int, default=3, help='Microscrope channel containing the two-photon data')
+                        help='Output directory in which to store hdf5 file and metadata json file.')
+    parser.add_argument('--channel', type=int, required=True, help='Microscrope channel containing the two-photon data')
 
     args = parser.parse_args()
-    tiff_to_hdf(args.inprefix, args.channel, args.outhdf)
+    tiff_to_hdf(args.inprefix, args.channel, args.outdir)
