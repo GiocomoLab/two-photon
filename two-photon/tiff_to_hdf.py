@@ -16,7 +16,10 @@ HDF5_KEY = '/data'  # Default key name in Suite2P.
 def tiff_to_hdf(infile, outfile):
     """Convert a directory of tiff files ripped from Bruker into a single HDF5 file."""
     os.makedirs(outfile.parent, exist_ok=True)
+    logger.info('Reading TIFF data')
     data = tifffile.imread(infile)
+    logger.info('Read TIFF data with shape %s and type %s', data.shape, data.dtype)
+    logger.info('Writing data to hdf5')
     with h5py.File(outfile, 'w') as h5file:
         h5file.create_dataset(HDF5_KEY, data=data)
 
