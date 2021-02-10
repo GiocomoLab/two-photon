@@ -22,6 +22,7 @@ def tiff_to_hdf(infile, outfile):
     logger.info('Writing data to hdf5')
     with h5py.File(outfile, 'w') as h5file:
         h5file.create_dataset(HDF5_KEY, data=data)
+    logger.info('Done')
 
 
 if __name__ == "__main__":
