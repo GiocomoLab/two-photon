@@ -5,21 +5,20 @@ import logging
 import os
 import pathlib
 
-import metadata
-import tiffdata
+import h5py
+import tifffile
 
 logger = logging.getLogger(__name__)
 
 HDF5_KEY = '/data'  # Default key name in Suite2P.
 
 
-def tiff_to_hdf(inprefix, channel, outdir):
+def tiff_to_hdf(infile, outfile):
     """Convert a directory of tiff files ripped from Bruker into a single HDF5 file."""
-    os.makedirs(outdir, exist_ok=True)
-    mdata = metadata.read(inprefix, outdir)
-    data = tiffdata.read(inprefix, mdata['size'], mdata['layout'], channel)
-    fname_data = outdir / 'data.hdf'
-    data.to_hdf5(fname_data, HDF5_KEY)
+    os.makedirs(outfile.parent, exist_ok=True)
+    data = tifffile.imread(infile)
+    with h5py.File(outfile, 'w') as h5file:
+        h5file.create_dataset(HDF5_KEY, data=data)
 
 
 if __name__ == "__main__":
@@ -27,15 +26,14 @@ if __name__ == "__main__":
                         format='%(asctime)s.%(msecs)03d %(module)s:%(lineno)s %(levelname)s %(message)s',
                         datefmt='%Y-%m-%d %H:%M:%S')
     parser = argparse.ArgumentParser(description='Convert tiff directory into hdf5 format')
-    parser.add_argument('--inprefix',
+    parser.add_argument('--infile',
                         type=pathlib.Path,
                         required=True,
-                        help='Prefix for the xml and tiff files used.')
-    parser.add_argument('--outdir',
+                        help='First OME TIFF file in the stack.')
+    parser.add_argument('--outfile',
                         type=pathlib.Path,
                         required=True,
                         help='Output directory in which to store hdf5 file and metadata json file.')
-    parser.add_argument('--channel', type=int, required=True, help='Microscrope channel containing the two-photon data')
 
     args = parser.parse_args()
-    tiff_to_hdf(args.inprefix, args.channel, args.outdir)
+    tiff_to_hdf(args.infile, args.outfile)
