@@ -137,7 +137,7 @@ conda env create -f environment.yml
 conda activate two-photon
 cd two-photon  # Yes, there is a two-photon directory inside a two-photon directory.
 # Many TIFF libraries will read in an entire OME stack when given just the first file:
-python tiff_to_hdf.py --infile=/path/to/first/tiff/blahblah_Cycle00001_Ch2_000001.ome.tif --outfile=/path/to/output/dir/data.hdf
+python tiff_to_hdf5.py --infile=/path/to/first/tiff/blahblah_Cycle00001_Ch2_000001.ome.tif --outfile=/path/to/output/dir/data.hdf5
 ```
 
 ## Suite2p Pipeline
