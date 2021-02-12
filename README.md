@@ -131,8 +131,8 @@ For safety, it will not delete the tiff files.
 
 ```sh
 git clone https://github.com/deisseroth-lab/two-photon.git
-git checkout chrisroat-tiff2hdf  # Branch currently under development
 cd two-photon
+git checkout chrisroat-tiff2hdf  # Branch currently under development
 conda env create -f environment.yml
 conda activate two-photon
 cd two-photon  # Yes, there is a two-photon directory inside a two-photon directory.
