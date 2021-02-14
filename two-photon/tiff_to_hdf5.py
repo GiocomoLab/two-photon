@@ -1,4 +1,4 @@
-"""Library for running Bruker image ripping utility."""
+"""Script to convert Bruker OME TIFF stack to hdf5."""
 
 import argparse
 import logging
@@ -22,10 +22,16 @@ class TiffToHdf5Error(Exception):
 
 
 def tiff_to_hdf(infile, outfile, delete_tiffs):
-    """Convert a directory of tiff files ripped from Bruker into a single HDF5 file."""
+    """Convert a stack of TIFF files ripped from Bruker into a single HDF5 file."""
     os.makedirs(outfile.parent, exist_ok=True)
 
-    logger.info('Reading TIFF data')
+    logger.info('Locating TIFF files')
+    channel = re.match(TIFF_RE, str(infile)).group('channel')
+    tiff_files = infile.parent.glob(TIFF_GLOB.format(channel=channel))
+    tiff_files = list(tiff_files)
+    logger.info('Found %d TIFF files with channel %s', len(tiff_files), channel)
+
+    logger.info('Reading TIFF files')
     try:
         data = tifffile.imread(infile)
     except TypeError:  # Error generated when infile does not exist (why not FileNotFound?)
@@ -38,14 +44,10 @@ def tiff_to_hdf(infile, outfile, delete_tiffs):
     logger.info('Done writing data')
 
     if delete_tiffs:
-        logger.info('Locating tiff files')
-        channel = re.match(TIFF_RE, str(infile)).group('channel')
-        tiff_files = infile.parent.glob(TIFF_GLOB.format(channel=channel))
-        tiff_files = list(tiff_files)
-        logger.info('Deleting %d tiffs to delete with channel %s', len(tiff_files), channel)
+        logger.info('Deleting TIFF files')
         for tiff_file in tiff_files:
             tiff_file.unlink()
-        logger.info('Done deleting tiff files')
+        logger.info('Done deleting TIFF files')
 
     logger.info('Done')
 
