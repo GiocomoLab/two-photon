@@ -4,6 +4,7 @@ import argparse
 import logging
 import os
 import pathlib
+import re
 
 import h5py
 import tifffile
@@ -12,7 +13,7 @@ logger = logging.getLogger(__name__)
 
 HDF5_KEY = '/data'  # Default key name in Suite2P.
 
-TIFF_RE = r'^.*_Cycle(?P<cycle>\d{5})_Ch(?P<channel>\d+)_(?P<num>\d{6}).ome.tif$'
+TIFF_RE = r'^.*_Cycle00001_Ch(?P<channel>\d+)_000001.ome.tif$'
 TIFF_GLOB = '*_Cycle*_Ch{channel}_*.ome.tif'
 
 
@@ -37,10 +38,11 @@ def tiff_to_hdf(infile, outfile, delete_tiffs):
     logger.info('Done writing data')
 
     if delete_tiffs:
-        logger.info('Deleting tiff files')
-        channel = infile.match(TIFF_RE).group('channel')
+        logger.info('Locating tiff files')
+        channel = re.match(TIFF_RE, str(infile)).group('channel')
         tiff_files = infile.parent.glob(TIFF_GLOB.format(channel=channel))
-        logger.info('Found %d tiffs to delete with channel %s', len(tiff_files), channel)
+        tiff_files = list(tiff_files)
+        logger.info('Deleting %d tiffs to delete with channel %s', len(tiff_files), channel)
         for tiff_file in tiff_files:
             tiff_file.unlink()
         logger.info('Done deleting tiff files')
@@ -59,16 +61,11 @@ if __name__ == "__main__":
         type=pathlib.Path,
         required=True,
         help='Output directory in which to store hdf5 file and metadata json file (must end in .h5 or .hdf5).')
-    parser.add_argument('--delete_tiffs', type=bool, action='store_true', help='Remove all tiff files when complete.')
+    parser.add_argument('--delete_tiffs', action='store_true', help='Remove all tiff files when complete.')
     args = parser.parse_args()
 
-    inmatch = args.infile.match(TIFF_RE)
-    if not inmatch:
-        raise TiffToHdf5Error('--infile does not fit expected pattern: *_CycleXXXXX_ChY_ZZZZZZ.ome.tif')
-    if inmatch.group('cycle') != '00001':
-        raise TiffToHdf5Error('--infile should be cycle 00001')
-    if inmatch.group('num') != '000001':
-        raise TiffToHdf5Error('--infile should be frame number 000001')
+    if not re.match(TIFF_RE, str(args.infile)):
+        raise TiffToHdf5Error('--infile does not fit expected pattern: *_Cycle00001_Ch*_000001.ome.tif')
 
     if args.outfile.suffix not in {'.h5', '.hdf5'}:
         raise TiffToHdf5Error('--outfile suffix should be .h5 or .hdf5 for compatibility with Suite2p')
