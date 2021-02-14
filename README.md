@@ -127,7 +127,7 @@ format.  A single HDF5 files is easier to process and copy that thousands of sma
 The HDF5 format is usable by programs like Suite2P.
 
 The following is a quickstart to setup and environment and run the TIFF->HDF5 conversion.
-For safety, it will not delete the tiff files.
+For safety, it will not delete the tiff files unless you specify `--delete_tiffs`.
 
 ```sh
 git clone https://github.com/deisseroth-lab/two-photon.git
