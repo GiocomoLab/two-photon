@@ -1,5 +1,7 @@
 # Script for running the initial processing and backups for Bruker 2p data.
 #
+# python C:\code\two-photon\two-photon\process.py --input_dir E:\AA --output_dir F:\AA\output --recording 20210413_M2:stim_targets1-000 --preprocess --channel 2
+# python C:\code\two-photon\two-photon\process.py --input_dir E:\AA --recording 20210413_M6:baseline_imaging-003 --output_dir F:\AA\output --preprocess --channel 2 --run_suite2p
 # python Documents\GitHub\two-photon\two-photon\process.py --input_dir E:\AD --output_dir E:\AD\output --recording 20200310M88:regL23-000 --backup_dir=O:\users\drinnenb\Data2p\ --rip
 # python Documents\GitHub\two-photon\two-photon\process.py --input_dir E:\AD --output_dir E:\AD\output --recording 20200310M88:regL23-000 --backup_dir=O:\users\drinnenb\Data2p\ --preprocess
 # python Documents\GitHub\two-photon\two-photon\process.py --input_dir E:\AD --output_dir E:\AD\output --recording 20200310M88:regL23-000 --backup_dir=O:\users\drinnenb\Data2p\ --run_suite2p
@@ -32,7 +34,10 @@ import rip
 import tiffdata
 import transform
 
-STIM_CHANNEL_NUM = 7
+import imageio
+import matplotlib.pyplot as plt
+
+STIM_CHANNEL_NUM = 1
 
 logger = logging.getLogger(__file__)
 
@@ -87,6 +92,8 @@ def main():
     stim_channel = mdata['channels'][STIM_CHANNEL_NUM]
 
     try:
+        # import pdb
+        # pdb.set_trace()
         stim_channel_name = stim_channel['name']
         stim_channel_enabled = stim_channel['enabled']
         logger.info('Found stim channel "%s", enabled=%s', stim_channel_name, stim_channel_enabled)
@@ -121,6 +128,8 @@ def main():
                 prev_data = get_dirname_hdf5(sn, rn) / 'data' / 'data.h5'
                 data_files.append(prev_data)
             data_files.append(fname_hdf5)
+            #import pdb
+            #pdb.set_trace()
             run_suite2p(data_files, dirname_output, mdata)
 
     if args.backup_output:
@@ -161,11 +170,16 @@ def preprocess(basename_input, dirname_output, fname_csv, fname_uncorrected, fna
     logger.info('Read voltage recordings from: %s, preview:\n%s', fname_csv, df_voltage.head())
     fname_frame_start = dirname_output / 'frame_start.h5'
     frame_start = artefacts.get_frame_start(df_voltage, fname_frame_start)
+    pulse_train = df_voltage[ mdata['channels'][2]['name']]
+    artefacts.get_write_vrPulses(pulse_train,dirname_output/ 'vr_frame_pulses.h5')
 
     if stim_channel_name:
         fname_artefacts = dirname_output / 'artefact.h5'
         df_artefacts = artefacts.get_bounds(df_voltage, frame_start, size, stim_channel_name, fname_artefacts, buffer,
                                             shift, settle_time)
+ 
+        if df_artefacts.size==0: #when voltage channel recorded, but no stim, this needs to be done to generate a data.h5 file
+            df_artefacts=None
     else:
         df_artefacts = None
 
@@ -208,7 +222,7 @@ def archive_dir(dirname):
     elif system == 'Windows':
         # Using 7z to mimic 'tar cfz' as per this post:
         # https://superuser.com/questions/244703/how-can-i-run-the-tar-czf-command-in-windows
-        cmd = f'7z -ttar a dummy {dirname}\* -so | 7z -si -tgzip a {fname_archive}'
+        cmd = f'"C:\\Program Files\\7-Zip\\7z" -ttar a dummy {dirname}\* -so | "C:\\Program Files\\7-Zip\\7z" -si -tgzip a {fname_archive}'
         run_cmd(cmd, expected_returncode=0, shell=True)
     else:
         raise BackupError('Do not recognize system: %s' % system)
@@ -247,24 +261,42 @@ def run_suite2p(hdf5_list, dirname_output, mdata):
 
     # Load suite2p only right before use, as it has a long load time.
     from suite2p import run_s2p
-    default_ops = run_s2p.default_ops()
+    import suite2p
+    default_ops = suite2p.default_ops()
+    #default_ops = run_s2p.default_ops()
+    #import pdb
+    #pdb.set_trace()
     params = {
         'input_format': 'h5',
         'data_path': [str(f.parent) for f in hdf5_list],
-        'save_path0': str(dirname_output),
+        'save_path0': str(dirname_output),#+'v2',
         'nplanes': z_planes,
         'fs': fs_param,
         'save_mat': True,
-        'bidi_corrected': True,
+        'bidi_corrected': False, #True
+        'do_bidiphase' : True,
         'spatial_hp': 50,
         'sparse_mode': False,
         'threshold_scaling': 3,
         'diameter': 6,
+        'do_registration': 1,
     }
     logger.info('Running suite2p on files:\n%s\n%s', '\n'.join(str(f) for f in hdf5_list), params)
     with open(dirname_output / 'recording_order.json', 'w') as fout:
         json.dump([str(e) for e in hdf5_list], fout, indent=4)
-    run_s2p.run_s2p(ops=default_ops, db=params)
+    ops = suite2p.run_s2p(ops=default_ops, db=params)
+    import imageio
+    import matplotlib.pyplot as plt
+    dns = dirname_output / 'suite2p' / 'plane?' / 'ops.npy'
+    pattern = str(dns)
+    for f in glob.glob(pattern,recursive=True):
+        ops = np.load(f,allow_pickle=True).item()
+        meanImg = ops['meanImg']
+        fn = f.replace('ops.npy','meanImage.png')
+        plt.imsave(fn,meanImg,cmap='gray')
+        fnt = fn.replace('.png','.tif')
+        imageio.imwrite(fnt,np.uint16(meanImg))
+
 
 
 def parse_args():
@@ -306,7 +338,7 @@ def parse_args():
                        help=('Name of one or more already preprocessed recordings to merge during suite2p.  '
                              'See --recording for format.'))
 
-    group.add_argument('--channel', type=int, default=3, help='Microscrope channel containing the two-photon data')
+    group.add_argument('--channel', type=int, default=2, help='Microscrope channel containing the two-photon data')
     group.add_argument(
         '--settle_time',
         type=float,

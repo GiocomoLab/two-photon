@@ -9,11 +9,16 @@ logger = logging.getLogger(__file__)
 
 
 def get_frame_start(df_voltage, fname):
-    frame_start_cat = df_voltage['frame starts'].apply(lambda x: 1 if x > 1 else 0)
+    frame_start_cat = df_voltage['ImageFrameTrigger'].apply(lambda x: 1 if x > 1 else 0)
     frame_start = frame_start_cat[frame_start_cat.diff() > 0.5].index
     frame_start.to_series().to_hdf(fname, 'frame_start', mode='a')
     logger.info('Stored calculated frame starts in %s, preview:\n%s', fname, frame_start[:5])
     return frame_start
+
+def get_write_vrPulses(pulse_train,fname):
+    vr_pulses = pulse_train>1
+    vr_timestamps = pulse_train[vr_pulses.diff().abs()>0.5]
+    vr_timestamps.to_hdf(fname,'vr_pulses',mode='a')
 
 
 def get_bounds(df_voltage, frame_start, size, stim_channel_name, fname, buffer, shift, settle_time):
@@ -34,6 +39,7 @@ def get_bounds(df_voltage, frame_start, size, stim_channel_name, fname, buffer, 
     df = pd.DataFrame({'frame': frame, 'z_plane': z_plane, 'y_min': y_px_start, 'y_max': y_px_stop})
     df = df.set_index('frame')
     df.to_hdf(fname, 'data', mode='w')
+    df.to_csv(fname.replace('.h5','.csv')) #for matlab later on
 
     stim_start.to_series().to_hdf(fname, 'stim_start', mode='a')
     stim_stop.to_series().to_hdf(fname, 'stim_stop', mode='a')
