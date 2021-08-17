@@ -39,7 +39,9 @@ def get_bounds(df_voltage, frame_start, size, stim_channel_name, fname, buffer, 
     df = pd.DataFrame({'frame': frame, 'z_plane': z_plane, 'y_min': y_px_start, 'y_max': y_px_stop})
     df = df.set_index('frame')
     df.to_hdf(fname, 'data', mode='w')
-    df.to_csv(fname.replace('.h5','.csv')) #for matlab later on
+    #import pdb
+    #pdb.set_trace()
+    df.to_csv(str(fname).replace('.h5','.csv')) #for matlab later on
 
     stim_start.to_series().to_hdf(fname, 'stim_start', mode='a')
     stim_stop.to_series().to_hdf(fname, 'stim_stop', mode='a')
