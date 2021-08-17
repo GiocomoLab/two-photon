@@ -87,6 +87,6 @@ def remove_artefacts(chunk, df, mydepth, block_info):
             y_slice = slice(int(row.y_min), int(row.y_max) + 1)
             before = chunk[index - 1, row.z_plane, y_slice]
             after = chunk[index + 1, row.z_plane, y_slice]
-            #chunk[index, row.z_plane, y_slice] = (before + after) / 2
-            chunk[index, row.z_plane, y_slice] = np.minimum(before,after)
+            chunk[index, row.z_plane, y_slice] = (before + after) / 2
+            #chunk[index, row.z_plane, y_slice] = np.minimum(before,after)
     return chunk
