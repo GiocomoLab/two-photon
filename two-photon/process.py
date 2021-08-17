@@ -36,6 +36,7 @@ import transform
 
 import imageio
 import matplotlib.pyplot as plt
+import shutil
 
 STIM_CHANNEL_NUM = 1
 
@@ -118,6 +119,8 @@ def main():
         # Suite2p uses whole directories, not filenames, when searching for data.
         fname_hdf5 = dirname_hdf5 / 'data' / 'data.h5'
         if args.preprocess:
+            #import pdb
+            #pdb.set_trace()
             preprocess(basename_input, dirname_output, fname_csv, fname_uncorrected_hdf5, fname_hdf5, mdata,
                        args.artefact_buffer*mdata['period']*1000/mdata['size']['y_px'], args.artefact_shift*mdata['period'], args.channel, stim_channel_name, args.settle_time)
         if args.run_suite2p:
@@ -159,6 +162,12 @@ def main():
 
     if args.backup_hdf5:
         backup(dirname_hdf5, dirname_backup / 'hdf5')
+
+    if args.remove_hdf5:
+        print('would remove: ')
+        print(dirname_hdf5)
+        #shutil.rmtree(dirname_hdf5)
+
 
 
 def preprocess(basename_input, dirname_output, fname_csv, fname_uncorrected, fname_data, mdata, buffer, shift, channel,
@@ -363,6 +372,7 @@ def parse_args():
     group.add_argument('--zip_data',
                        action='store_true',
                        help='Compress data directory (mostly TIFF files) into a single file for backup')
+    group.add_argument('--remove_hdf5', action='store_true', help='remove data.h5 and corrected.h5 by removing hdf5 dir')
 
     args = parser.parse_args()
 
