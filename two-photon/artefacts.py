@@ -5,6 +5,7 @@ import logging
 import numpy as np
 import pandas as pd
 import pdb
+import re
 logger = logging.getLogger(__file__)
 
 
@@ -16,8 +17,9 @@ def get_frame_start(df_voltage, fname):
     return frame_start
 
 def get_write_vrPulses(pulse_train,fname):
-    vr_pulses = pulse_train>1
-    vr_timestamps = pulse_train[vr_pulses.diff().abs()>0.5]
+    vr_pulses = pulse_train>1 #turn it into boolean seres
+    vr_timestamps = pulse_train[vr_pulses.diff()>0] #this works because diff on boolean series is xor operation, so both the upward and the downward will give True
+    #however, would not work for single pulse per frame, then do same as in get_frame_start
     vr_timestamps.to_hdf(fname,'vr_pulses',mode='a')
 
 
@@ -32,8 +34,16 @@ def get_bounds(df_voltage, frame_start, size, stim_channel_name, fname, buffer, 
 
     stim = df_voltage[stim_channel_name].apply(lambda x: 1 if x > 1 else 0)
     stim_start = stim[stim.diff() > 0.5].index + shift
-    stim_stop = stim[stim.diff() < -0.5].index + shift + buffer
+    #stimstring = stim.astype(str).str.cat()
+    
+    #start=[m.start(0) for m in re.finditer('0011',stimstring)]
+    #start = np.array(start)+2
+    #stim_start = stim.iloc[start].index+shift
+    #stim_stop = stim_start+shift+buffer+6.
 
+    stim_stop = stim[stim.diff() < -0.5].index + shift + buffer
+    #import pdb
+    #pdb.set_trace()
     frame, z_plane, y_px_start, y_px_stop = get_start_stop(stim_start, stim_stop, frame_start, y_px, shape, settle_time)
 
     df = pd.DataFrame({'frame': frame, 'z_plane': z_plane, 'y_min': y_px_start, 'y_max': y_px_stop})
