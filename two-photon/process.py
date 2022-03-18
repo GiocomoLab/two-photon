@@ -82,12 +82,10 @@ def main():
         rip.raw_to_tiff(dirname_input, args.ripper)
 
     # Quick exit if our only operation is to rip
-    if not (args.backup_data or args.preprocess or args.run_suite2p or args.backup_output or args.backup_hdf5):
+    if not (args.backup_data or args.preprocess or args.run_suite2p or args.backup_output or args.backup_hdf5 or args.run_cellpose):
         return
 
-    # Quick exit if our only operation is to rip
-    if not (args.backup_data or args.preprocess or args.run_suite2p or args.backup_output or args.backup_hdf5):
-        return
+  
 
     mdata = metadata.read(basename_input, dirname_output)
     stim_channel = mdata['channels'][STIM_CHANNEL_NUM]
@@ -111,13 +109,22 @@ def main():
             os.remove(fname_zipped_data)
         else:
             backup(dirname_input, dirname_backup / 'data')
+    
 
-    if args.preprocess or args.run_suite2p:
+    if args.preprocess or args.run_suite2p or args.run_cellpose:
         fname_uncorrected_hdf5 = dirname_hdf5 / 'uncorrected' / 'uncorrected.h5'
         # This needs to be kept in sync with prev_data format below.
         # NOTE: The hdf5 file needs to be in its own directory with no other hdf5 files.  This is because
         # Suite2p uses whole directories, not filenames, when searching for data.
         fname_hdf5 = dirname_hdf5 / 'data' / 'data.h5'
+
+        if args.run_cellpose:
+            channels =[args.channel]
+            if args.struct_channel>-1:
+                channels.append(args.struct_channel)
+            cellpose(basename_input,dirname_output,mdata,channels)
+
+
         if args.preprocess:
             #import pdb
             #pdb.set_trace()
@@ -171,7 +178,7 @@ def main():
 
 
 def preprocess(basename_input, dirname_output, fname_csv, fname_uncorrected, fname_data, mdata, buffer, shift, channel,
-               stim_channel_name, settle_time):
+               stim_channel_name, settle_time,calc_mean = False):
     """Main method for running processing of TIFF files into HDF5."""
     size = mdata['size']
 
@@ -193,7 +200,27 @@ def preprocess(basename_input, dirname_output, fname_csv, fname_uncorrected, fna
         df_artefacts = None
 
     data = tiffdata.read(basename_input, size, mdata['layout'], channel)
+   
+
     transform.convert(data, fname_data, df_artefacts, fname_uncorrected)
+
+def cellpose(basename_input,dirname_output,mdata,channels):
+    size = mdata['size']
+    dirname_mean = dirname_output / 'mean_images'
+    #import pdb
+    #pdb.set_trace()
+    os.makedirs(dirname_mean, exist_ok=True)
+    for c in channels:
+    
+        data = tiffdata.read(basename_input, size, mdata['layout'], c)
+        m = data.sum(axis=0).compute()
+        for layer in range(mdata['size']['z_planes']):
+            fnt = dirname_mean / 'channel{}_plane{}.tif'.format(c,layer)
+            #fnt = fname_data.replace('.h5','_plane{}.tif'.format(layer))
+            imageio.imwrite(fnt,np.squeeze(m[layer]))
+    
+
+
 
 
 def backup(local_location, backup_location):
@@ -346,7 +373,9 @@ def parse_args():
                        default=[],
                        help=('Name of one or more already preprocessed recordings to merge during suite2p.  '
                              'See --recording for format.'))
-
+    
+    group.add_argument('--run_cellpose',action='store_true', help='Channel containing struct channel, -1 if not required')
+    group.add_argument('--struct_channel',type=int,default = 3, help='structure channel, works with cellpose only for now')
     group.add_argument('--channel', type=int, default=2, help='Microscrope channel containing the two-photon data')
     group.add_argument(
         '--settle_time',
