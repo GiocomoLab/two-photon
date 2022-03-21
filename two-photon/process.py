@@ -205,6 +205,8 @@ def preprocess(basename_input, dirname_output, fname_csv, fname_uncorrected, fna
     transform.convert(data, fname_data, df_artefacts, fname_uncorrected)
 
 def cellpose(basename_input,dirname_output,mdata,channels):
+    #ecalculates mean image for both channels
+    #runs cellpose on struct_chan if exists (second element in channels), otherwise on first element of channels
     size = mdata['size']
     dirname_mean = dirname_output / 'mean_images'
     #import pdb
@@ -215,11 +217,30 @@ def cellpose(basename_input,dirname_output,mdata,channels):
         data = tiffdata.read(basename_input, size, mdata['layout'], c)
         m = data.sum(axis=0).compute()
         for layer in range(mdata['size']['z_planes']):
-            fnt = dirname_mean / 'channel{}_plane{}.tif'.format(c,layer)
+            fnt = dirname_mean / 'plane{}_channel_{}.tif'.format(layer,c)
             #fnt = fname_data.replace('.h5','_plane{}.tif'.format(layer))
             imageio.imwrite(fnt,np.squeeze(m[layer]))
-    
+    os.environ['KMP_DUPLICATE_LIB_OK']='True' #without this statement, it will crash on some systems
+    from cellpose import models, io    
+    import glob 
+    last_element = channels[0] if len(channels)==1 else channels[1]
+    file_filter = '*channel_{}.tif'.format(last_element) 
+    files = glob.glob(os.path.join(dirname_mean,file_filter))
+    diameter = 14.
+    model = models.Cellpose(gpu=False, model_type='cyto2')
+    cp_channels = [0,0]
+    for filename in files:
+        img = io.imread(filename)
+        masks, flows, styles, diams = model.eval(img, diameter=14., channels=[0,0],verbose=True)
 
+        # save results so you can load in gui
+        io.masks_flows_to_seg(img, masks, flows, diams, filename, [0,0])
+
+        # save results as png
+        io.save_to_png(img, masks, flows, filename)
+    os.environ['KMP_DUPLICATE_LIB_OK']='False'
+
+    #run cellpose python -m cellpose --dir dirname_mean --pretrained_model cyto2 --diameter 14. --save_png --img_filter
 
 
 
