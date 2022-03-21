@@ -2,35 +2,39 @@ name: two-photon
 channels:
   - conda-forge
   - defaults
+  - pytorch
+  - numba
+
 dependencies:
-  - dask
-  - tbb
-  - numpy<1.19.0
-  - pandas
+  - python>=3.8,<3.9
   - pip
-  - pytables
-  - python>=3.7.6,<3.8
-  - scipy
+  - dask
   - yapf
   - jupyterlab
-  - mkl_fft=1.0.10
-  - mkl=2019.3
-  - numba<0.50.0
+  - mkl
+  - tbb
+  - numpy
+  - numba
   - matplotlib
-  - scipy
+  - scipy>=1.4.0
   - scikit-learn
-  - pyqt
+  - h5py=2.10.0
   - scikit-image
-     
+  - pandas
+  - pytables
+  - mkl_fft
   - pip:
-    - h5py==2.10.0
+    - pyqt5
+    - pyqt5.sip
+    - pyqt5-tools
+    - torch>=1.7.1
     - natsort
     - rastermap>0.1.0
-    - tifffile==2020.7.22
+    - tifffile
     - scanimage-tiff-reader>=1.4.1
     - pyqtgraph
     - importlib-metadata
     - paramiko
     - pynwb
     - sbxreader
-    - suite2p==0.10.0
+    - cellpose
