@@ -186,8 +186,11 @@ def preprocess(basename_input, dirname_output, fname_csv, fname_uncorrected, fna
     logger.info('Read voltage recordings from: %s, preview:\n%s', fname_csv, df_voltage.head())
     fname_frame_start = dirname_output / 'frame_start.h5'
     frame_start = artefacts.get_frame_start(df_voltage, fname_frame_start)
-    pulse_train = df_voltage[ mdata['channels'][2]['name']]
-    artefacts.get_write_vrPulses(pulse_train,dirname_output/ 'vr_frame_pulses.h5')
+    try:
+        pulse_train = df_voltage[ mdata['channels'][2]['name']]
+        artefacts.get_write_vrPulses(pulse_train,dirname_output/ 'vr_frame_pulses.h5')
+    except:
+        print('did not write vr_frame_pulses.h5')
 
     if stim_channel_name:
         fname_artefacts = dirname_output / 'artefact.h5'

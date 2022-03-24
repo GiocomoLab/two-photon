@@ -10,7 +10,11 @@ logger = logging.getLogger(__file__)
 
 
 def get_frame_start(df_voltage, fname):
-    frame_start_cat = df_voltage['ImageFrameTrigger'].apply(lambda x: 1 if x > 1 else 0)
+    #pdb.set_trace()
+    im_trigger_name = 'ImageFrameTrigger'
+    if not im_trigger_name in df_voltage:
+        im_trigger_name = 'frame starts'
+    frame_start_cat = df_voltage[im_trigger_name].apply(lambda x: 1 if x > 1 else 0)
     frame_start = frame_start_cat[frame_start_cat.diff() > 0.5].index
     frame_start.to_series().to_hdf(fname, 'frame_start', mode='a')
     logger.info('Stored calculated frame starts in %s, preview:\n%s', fname, frame_start[:5])
