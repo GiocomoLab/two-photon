@@ -122,7 +122,7 @@ def main():
             channels =[args.channel]
             if args.struct_channel>-1:
                 channels.append(args.struct_channel)
-            cellpose(basename_input,dirname_output,mdata,channels)
+            cellpose(basename_input,dirname_output,mdata,channels,dirname_hdf5)
 
 
         if args.preprocess:
@@ -207,22 +207,39 @@ def preprocess(basename_input, dirname_output, fname_csv, fname_uncorrected, fna
 
     transform.convert(data, fname_data, df_artefacts, fname_uncorrected)
 
-def cellpose(basename_input,dirname_output,mdata,channels):
+def cellpose(basename_input,dirname_output,mdata,channels,dirname_hdf5):
     #ecalculates mean image for both channels
     #runs cellpose on struct_chan if exists (second element in channels), otherwise on first element of channels
     size = mdata['size']
     dirname_mean = dirname_output / 'mean_images'
     #import pdb
     #pdb.set_trace()
+    s2p_params = {
+        'roidetect': False
+
+    }
+    
+    
     os.makedirs(dirname_mean, exist_ok=True)
     for c in channels:
-    
+        dirname_this_channel = dirname_output / 'channel_{}'.format(c)
+        
+        
         data = tiffdata.read(basename_input, size, mdata['layout'], c)
-        m = data.sum(axis=0).compute()
+        fname_hdf5 = dirname_hdf5 / 'data_channel_{}'.format(c) / 'data.h5'
+        transform.convert(data, fname_hdf5)
+        os.makedirs(dirname_this_channel, exist_ok=True)
+        
+        run_suite2p([fname_hdf5],dirname_this_channel,mdata,s2p_params)
         for layer in range(mdata['size']['z_planes']):
-            fnt = dirname_mean / 'plane{}_channel_{}.tif'.format(layer,c)
-            #fnt = fname_data.replace('.h5','_plane{}.tif'.format(layer))
-            imageio.imwrite(fnt,np.squeeze(m[layer]))
+            src = dirname_this_channel / 'suite2p' / 'plane{}'.format(layer) / 'meanImage.tif'
+            dest = dirname_mean / 'plane{}_channel_{}.tif'.format(layer,c)
+            shutil.copyfile(src,dest)
+        # m = data.sum(axis=0).compute()
+        # for layer in range(mdata['size']['z_planes']):
+        #     fnt = dirname_mean / 'plane{}_channel_{}.tif'.format(layer,c)
+        #     #fnt = fname_data.replace('.h5','_plane{}.tif'.format(layer))
+        #     imageio.imwrite(fnt,np.squeeze(m[layer]))
     os.environ['KMP_DUPLICATE_LIB_OK']='True' #without this statement, it will crash on some systems
     from cellpose import models, io    
     import glob 
@@ -315,7 +332,7 @@ def run_cmd(cmd, expected_returncode, shell=False):
     logger.info('Output:\n%s', result.stdout.decode('utf-8'))
 
 
-def run_suite2p(hdf5_list, dirname_output, mdata):
+def run_suite2p(hdf5_list, dirname_output, mdata,cellpose_ops={}):
     z_planes = mdata['size']['z_planes']
     fs_param = 1. / (mdata['period'] * z_planes)
 
@@ -341,6 +358,7 @@ def run_suite2p(hdf5_list, dirname_output, mdata):
         'diameter': 6,
         'do_registration': 1,
     }
+    params = {**params,**cellpose_ops}
     logger.info('Running suite2p on files:\n%s\n%s', '\n'.join(str(f) for f in hdf5_list), params)
     with open(dirname_output / 'recording_order.json', 'w') as fout:
         json.dump([str(e) for e in hdf5_list], fout, indent=4)
