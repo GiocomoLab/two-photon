@@ -9,7 +9,8 @@ import h5py
 import numpy as np
 
 logger = logging.getLogger(__name__)
-
+import dask
+#dask.config.set(scheduler='synchronous')  # overwrite default with single-threaded scheduler
 HDF5_KEY = '/data'  # Default key name in Suite2P.
 
 
@@ -41,12 +42,14 @@ def convert(data, fname_data, df_artefacts=None, fname_uncorrected=None):
             # read back to write the 2nd one.
             logger.info('Writing uncorrected data to %s', fname_uncorrected)
             unlink(fname_uncorrected)
+            # comment out os makedirs as well if you want to skip creating fname_uncorrected, also line 61 here and 74 in proces
             os.makedirs(fname_uncorrected.parent, exist_ok=True)
             data.to_hdf5(fname_uncorrected, HDF5_KEY)
 
             logger.info('Writing corrected data to %s', fname_data)
             with h5py.File(fname_uncorrected, 'r') as hfile:
                 arr = da.from_array(hfile[HDF5_KEY])
+                arr = arr.rechunk(data.chunksize)
                 # Depth of 1 in the first coordinate means to bring in the frames before and after
                 # the chunk -- needed for doing diffs.
                 depth = (1, 0, 0, 0)
@@ -54,8 +57,12 @@ def convert(data, fname_data, df_artefacts=None, fname_uncorrected=None):
                                                  depth=depth,
                                                  dtype=data.dtype,
                                                  df=df_artefacts,
-                                                 mydepth=depth)
+                                                 mydepth=depth,
+                                                 boundary = 'reflect')
                 unlink(fname_data)
+                #import pdb
+                #pdb.set_trace()
+                #arr.compute(scheduler = 'synchronous')
                 os.makedirs(fname_data.parent, exist_ok=True)
                 data_corrected.to_hdf5(fname_data, HDF5_KEY)
 
@@ -84,9 +91,16 @@ def remove_artefacts(chunk, df, mydepth, block_info):
         # Use `frame:frame` so the following slice always returns a frame.  Using just `frame`
         # would lead to a series being returned if there was only one present.
         for row in df.loc[frame:frame].itertuples():
-            y_slice = slice(int(row.y_min), int(row.y_max) + 1)
-            before = chunk[index - 1, row.z_plane, y_slice]
-            after = chunk[index + 1, row.z_plane, y_slice]
-            chunk[index, row.z_plane, y_slice] = (before + after) / 2
+            try:
+                y_slice = slice(int(row.y_min), int(row.y_max) + 1)
+                before = chunk[index - 1, row.z_plane, y_slice]
+                after = chunk[index + 1, row.z_plane, y_slice]
+                chunk[index, row.z_plane, y_slice] = (before + after) / 2
+            except IndexError as err:
+                print(str(row) + ' ' + str(index) + ' ' + str(chunk.shape) )
+                #print(index)
+                #print(chunk.shape)
+
+                raise err
             #chunk[index, row.z_plane, y_slice] = np.minimum(before,after)
     return chunk
