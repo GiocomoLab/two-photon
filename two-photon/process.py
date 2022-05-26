@@ -355,8 +355,10 @@ def run_suite2p(hdf5_list, dirname_output, mdata,cellpose_ops={}):
         'spatial_hp': 50,
         'sparse_mode': False,
         'threshold_scaling': 3,
-        'diameter': 6,
+        'diameter': 8,
         'do_registration': 1,
+        'nbinned':2000,
+        'tau':1.,
     }
     params = {**params,**cellpose_ops}
     logger.info('Running suite2p on files:\n%s\n%s', '\n'.join(str(f) for f in hdf5_list), params)
