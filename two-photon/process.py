@@ -147,33 +147,37 @@ def main():
         # This csv file is part of the original data and backed up with --backup_data.
         # It is also backed up here so that it can be immediately available with the rest of
         # the output data, even if --backup_data is not used.
-        backup(fname_csv, dirname_backup / 'output')
-        if stim_channel_name:
-            slm_date = datetime.strptime(session_name[:8], '%Y%m%d').strftime('%d-%b-%Y')
-            slm_mouse = session_name[8:]
+        #backup(fname_csv, dirname_backup / 'output')
+        # if stim_channel_name:
+        #     slm_date = datetime.strptime(session_name[:8], '%Y%m%d').strftime('%d-%b-%Y')
+        #     slm_mouse = session_name[8:]
 
-            slm_root = args.slm_setup_dir / slm_date
-            slm_targets = slm_root / slm_mouse
-            slm_trial_order_pattern = '*_' + slm_mouse + '_' + recording_name
+        #     slm_root = args.slm_setup_dir / slm_date
+        #     slm_targets = slm_root / slm_mouse
+        #     slm_trial_order_pattern = '*_' + slm_mouse + '_' + recording_name
 
-            backup(slm_targets, dirname_backup / 'targets')
-            trial_order_folder = glob.glob(os.path.join(slm_root,slm_trial_order_pattern))
-            trial_order_path = pathlib.WindowsPath(trial_order_folder[0])
-            backup(trial_order_path,dirname_backup / 'trial_order')
-            # backup_pattern(slm_root, slm_trial_order_pattern, dirname_backup / 'trial_order')
+        #     backup(slm_targets, dirname_backup / 'targets')
+        #     trial_order_folder = glob.glob(os.path.join(slm_root,slm_trial_order_pattern))
+        #     trial_order_path = pathlib.WindowsPath(trial_order_folder[0])
+        #     backup(trial_order_path,dirname_backup / 'trial_order')
+        #     # backup_pattern(slm_root, slm_trial_order_pattern, dirname_backup / 'trial_order')
 
-        backup_done_file = args.backup_dir / 'backup_done' / f'{session_name}_{recording_name}_ETL{args.ETL_depths}.backup_done'
-        backup_done_file.parent.mkdir(parents=True, exist_ok=True)
-        logger.info('Creating backup_done file: %s', backup_done_file)
-        backup_done_file.touch()
+        # backup_done_file = args.backup_dir / 'backup_done' / f'{session_name}_{recording_name}_ETL{args.ETL_depths}.backup_done'
+        # backup_done_file.parent.mkdir(parents=True, exist_ok=True)
+        # logger.info('Creating backup_done file: %s', backup_done_file)
+        # backup_done_file.touch()
 
     if args.backup_hdf5:
-        backup(dirname_hdf5, dirname_backup / 'hdf5')
+        #import pdb
+        #pdb.set_trace()
+        backup(dirname_hdf5 / 'data', dirname_backup / 'hdf5' / 'data')
 
     if args.remove_hdf5:
         print('would remove: ')
         print(dirname_hdf5)
-        #shutil.rmtree(dirname_hdf5)
+        import pdb
+        pdb.set_trace()
+        shutil.rmtree(dirname_hdf5)
 
 
 
@@ -343,6 +347,13 @@ def run_suite2p(hdf5_list, dirname_output, mdata,cellpose_ops={}):
     #default_ops = run_s2p.default_ops()
     #import pdb
     #pdb.set_trace()
+    si = sum([os.path.getsize(it) for it in hdf5_list])
+
+    if si>7*10e9:
+        nbinned = 1500
+        print('large file size, reducing nbinned')
+    else:
+        nbinned = 5000
     params = {
         'input_format': 'h5',
         'data_path': [str(f.parent) for f in hdf5_list],
@@ -354,11 +365,12 @@ def run_suite2p(hdf5_list, dirname_output, mdata,cellpose_ops={}):
         'do_bidiphase' : True,
         'spatial_hp': 50,
         'sparse_mode': False,
-        'threshold_scaling': 3,
+        'threshold_scaling': 2., #default 4 #2 for 8saire
         'diameter': 8,
         'do_registration': 1,
-        'nbinned':2000,
+        'nbinned':nbinned, #smaller nbinned, larger bin_size, smaller file #5000 orig
         'tau':1.,
+        'roidetect': True,
     }
     params = {**params,**cellpose_ops}
     logger.info('Running suite2p on files:\n%s\n%s', '\n'.join(str(f) for f in hdf5_list), params)
@@ -419,7 +431,7 @@ def parse_args():
                              'See --recording for format.'))
     
     group.add_argument('--run_cellpose',action='store_true', help='Channel containing struct channel, -1 if not required')
-    group.add_argument('--struct_channel',type=int,default = 3, help='structure channel, works with cellpose only for now')
+    group.add_argument('--struct_channel',type=int,default = 1, help='structure channel, works with cellpose only for now')
     group.add_argument('--channel', type=int, default=2, help='Microscrope channel containing the two-photon data')
     group.add_argument(
         '--settle_time',
