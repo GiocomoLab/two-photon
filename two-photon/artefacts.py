@@ -23,7 +23,7 @@ def get_frame_start(df_voltage, fname):
 def get_write_vrPulses(pulse_train,fname):
     vr_pulses = pulse_train>1 #turn it into boolean seres
     vr_timestamps = pulse_train[vr_pulses.diff()>0] #this works because diff on boolean series is xor operation, so both the upward and the downward will give True
-    #however, would not work for single pulse per frame, then do same as in get_frame_start
+    #### however, would not work for single pulse per frame, then do same as in get_frame_start ###
     vr_timestamps.to_hdf(fname,'vr_pulses',mode='a')
 
 
@@ -98,19 +98,22 @@ def get_start_stop(stim_start, stim_stop, frame_start, y_px, shape, settle_time)
 
 def get_loc(times, frame_start, y_px, shape, settle_time):
     """Determine the location of event times within the data, given the frame start times."""
-    v_idx = times < frame_start.max()
-    interp = np.interp(times[v_idx], frame_start, range(len(frame_start)))
-    indices = interp.astype(np.int)
-    idx = np.transpose(np.unravel_index(indices, shape))
+    v_idx = times < frame_start.max() #valid starts
+    interp = np.interp(times[v_idx], frame_start, range(len(frame_start))) #convert time to fractional frame
+    indices = interp.astype(np.int) #actual frame
+    idx = np.transpose(np.unravel_index(indices, shape)) #convert to cycle and plane
 
     frame_times = (frame_start[1:] - frame_start[:-1])
     frame_times_stims = frame_times[indices]
+    mft=np.full_like(frame_times,np.mean(frame_times)) #get rid of the jitter by the 5khz aux recording, assume frames are recorded regularly
+    frame_times_stims = mft[indices]
 
-    offset = (interp - indices) * frame_times_stims
+    offset = (interp - indices) * frame_times_stims #in ms, how long after frame onset
     acquisition_times = frame_times_stims - settle_time
-    y_offset = y_px * offset / acquisition_times
-
+    #y_offset = y_px * offset / acquisition_times
+    y_offset = y_px*offset/(0.995*acquisition_times)
     # If offset is greater than y_px, it has occurred during stim.  Cap at y_px.
     y_offset = np.minimum(y_px, y_offset)
-
+    #import pdb
+    #pdb.set_trace()
     return idx, y_offset
