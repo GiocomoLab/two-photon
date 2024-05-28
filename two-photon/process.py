@@ -185,7 +185,8 @@ def preprocess(basename_input, dirname_output, fname_csv, fname_uncorrected, fna
                stim_channel_name, settle_time,calc_mean = False):
     """Main method for running processing of TIFF files into HDF5."""
     size = mdata['size']
-
+    #import pdb
+    #pdb.set_trace()
     df_voltage = pd.read_csv(fname_csv, index_col='Time(ms)', skipinitialspace=True)
     logger.info('Read voltage recordings from: %s, preview:\n%s', fname_csv, df_voltage.head())
     fname_frame_start = dirname_output / 'frame_start.h5'
@@ -195,12 +196,17 @@ def preprocess(basename_input, dirname_output, fname_csv, fname_uncorrected, fna
         artefacts.get_write_vrPulses(pulse_train,dirname_output/ 'vr_frame_pulses.h5')
     except:
         print('did not write vr_frame_pulses.h5')
+    try:
+        led_train = df_voltage[ mdata['channels'][3]['name']]
+        artefacts.get_write_vrPulses(led_train,dirname_output/ 'led_pulses.h5')
+    except:
+        print('did not write led_pulses.h5')
 
     if stim_channel_name:
         fname_artefacts = dirname_output / 'artefact.h5'
         df_artefacts = artefacts.get_bounds(df_voltage, frame_start, size, stim_channel_name, fname_artefacts, buffer,
                                             shift, settle_time)
- 
+        #return
         if df_artefacts.size==0: #when voltage channel recorded, but no stim, this needs to be done to generate a data.h5 file
             df_artefacts=None
     else:
@@ -210,59 +216,80 @@ def preprocess(basename_input, dirname_output, fname_csv, fname_uncorrected, fna
    
 
     transform.convert(data, fname_data, df_artefacts, fname_uncorrected)
+    #remove uncorrected hdf5
+    fname_uncorrected.unlink(missing_ok=True)
 
 def cellpose(basename_input,dirname_output,mdata,channels,dirname_hdf5):
-    #ecalculates mean image for both channels
+    #TODO: add these to s2p_params: data_path: on E, 'input_format': 'bruker', 'nchannels': 2 
+    #this actually reads in the tiffs directly, via suite2p (no hdf needed)
+    #OLD: calculates mean image for both channels by registering them SEPERATELY
     #runs cellpose on struct_chan if exists (second element in channels), otherwise on first element of channels
     size = mdata['size']
     dirname_mean = dirname_output / 'mean_images'
     #import pdb
     #pdb.set_trace()
-    s2p_params = {
-        'roidetect': False
-
+    s2p_params = { #will get merged with regular ops in run_suite2p
+        'roidetect': False,
+        'align_by_chan': 2, # (int, default: 1) which channel to use for alignment 
+        'do_registration': 1,
+            'input_format': 'bruker',
+        'nchannels': 2,
+        
     }
     
+    run_suite2p([basename_input],dirname_output,mdata,s2p_params)
     
-    os.makedirs(dirname_mean, exist_ok=True)
-    for c in channels:
-        dirname_this_channel = dirname_output / 'channel_{}'.format(c)
+    # os.makedirs(dirname_mean, exist_ok=True)
+    # for c in channels:
+    #     dirname_this_channel = dirname_output / 'channel_{}'.format(c)
         
         
-        data = tiffdata.read(basename_input, size, mdata['layout'], c)
-        fname_hdf5 = dirname_hdf5 / 'data_channel_{}'.format(c) / 'data.h5'
-        transform.convert(data, fname_hdf5)
-        os.makedirs(dirname_this_channel, exist_ok=True)
-        
-        run_suite2p([fname_hdf5],dirname_this_channel,mdata,s2p_params)
-        for layer in range(mdata['size']['z_planes']):
-            src = dirname_this_channel / 'suite2p' / 'plane{}'.format(layer) / 'meanImage.tif'
-            dest = dirname_mean / 'plane{}_channel_{}.tif'.format(layer,c)
-            shutil.copyfile(src,dest)
+    #     data = tiffdata.read(basename_input, size, mdata['layout'], c)
+    #     fname_hdf5 = dirname_hdf5 / 'data_channel_{}'.format(c) / 'data.h5'
+    #     transform.convert(data, fname_hdf5)
+    #     os.makedirs(dirname_this_channel, exist_ok=True)
+    #     try:
+    #         run_suite2p([fname_hdf5],dirname_this_channel,mdata,s2p_params)
+    #         for layer in range(mdata['size']['z_planes']):
+    #             src = dirname_this_channel / 'suite2p' / 'plane{}'.format(layer) / 'meanImage.tif'
+    #             dest = dirname_mean / 'plane{}_channel_{}.tif'.format(layer,c)
+    #             shutil.copyfile(src,dest)
+    #     except:
+    #         pass
         # m = data.sum(axis=0).compute()
         # for layer in range(mdata['size']['z_planes']):
         #     fnt = dirname_mean / 'plane{}_channel_{}.tif'.format(layer,c)
         #     #fnt = fname_data.replace('.h5','_plane{}.tif'.format(layer))
         #     imageio.imwrite(fnt,np.squeeze(m[layer]))
-    os.environ['KMP_DUPLICATE_LIB_OK']='True' #without this statement, it will crash on some systems
-    from cellpose import models, io    
-    import glob 
-    last_element = channels[0] if len(channels)==1 else channels[1]
-    file_filter = '*channel_{}.tif'.format(last_element) 
-    files = glob.glob(os.path.join(dirname_mean,file_filter))
-    diameter = 14.
-    model = models.Cellpose(gpu=False, model_type='cyto2')
-    cp_channels = [0,0]
-    for filename in files:
-        img = io.imread(filename)
-        masks, flows, styles, diams = model.eval(img, diameter=14., channels=[0,0],verbose=True)
+        
+    # os.environ['KMP_DUPLICATE_LIB_OK']='True' #without this statement, it will crash on some systems
+    # from cellpose import models, io    
+    # import glob 
+    # last_element = channels[0] if len(channels)==1 else channels[1]
+    # file_filter = '*channel_{}.tif'.format(last_element) 
+    # files = glob.glob(os.path.join(dirname_mean,file_filter))
+    # #diameter = 14.
+    # #model = models.Cellpose(gpu=False, model_type='cyto2')
+    # model = models.CellposeModel(gpu=False, pretrained_model=r'C:\Users\User\Desktop\CP_20230228_102521')
+    # cp_channels = [0,0]
+    # diameter = model.diam_labels
+    # for filename in files:
+    #     img = io.imread(filename)
+    #     masks, flows, styles = model.eval(img, diameter=diameter, channels=[0,0])
 
-        # save results so you can load in gui
-        io.masks_flows_to_seg(img, masks, flows, diams, filename, [0,0])
-
-        # save results as png
-        io.save_to_png(img, masks, flows, filename)
-    os.environ['KMP_DUPLICATE_LIB_OK']='False'
+    #     # save results so you can load in gui
+    #     io.masks_flows_to_seg(img, masks, flows, diameter, filename, [0,0])
+    #     io.save_masks(img, 
+    #             masks, 
+    #             flows, 
+    #             filename, 
+    #             png=True, # save masks as PNGs and save example image
+    #             tif=True, # save masks as TIFFs
+    #             save_txt=True, # save txt outlines for ImageJ
+    #             save_flows=False, # save flows as TIFFs
+    #             save_outlines=True, # save outlines as TIFFs 
+    #             )
+    # os.environ['KMP_DUPLICATE_LIB_OK']='False'
 
     #run cellpose python -m cellpose --dir dirname_mean --pretrained_model cyto2 --diameter 14. --save_png --img_filter
 
@@ -303,7 +330,7 @@ def archive_dir(dirname):
     elif system == 'Windows':
         # Using 7z to mimic 'tar cfz' as per this post:
         # https://superuser.com/questions/244703/how-can-i-run-the-tar-czf-command-in-windows
-        cmd = f'"C:\\Program Files\\7-Zip\\7z" -ttar a dummy {dirname}\* -so | "C:\\Program Files\\7-Zip\\7z" -si -tgzip a {fname_archive}'
+        cmd = f'"C:\\Program Files\\7-Zip\\7z" -ttar a d1ummy {dirname}\* -so | "C:\\Program Files\\7-Zip\\7z" -si -tgzip a {fname_archive}'
         run_cmd(cmd, expected_returncode=0, shell=True)
     else:
         raise BackupError('Do not recognize system: %s' % system)
@@ -341,20 +368,32 @@ def run_suite2p(hdf5_list, dirname_output, mdata,cellpose_ops={}):
     fs_param = 1. / (mdata['period'] * z_planes)
 
     # Load suite2p only right before use, as it has a long load time.
-    from suite2p import run_s2p
+    from suite2p import run_s2p, default_ops
     import suite2p
-    default_ops = suite2p.default_ops()
+    default_ops = default_ops()
     #default_ops = run_s2p.default_ops()
     #import pdb
     #pdb.set_trace()
-    si = sum([os.path.getsize(it) for it in hdf5_list])
+    try:
+        si = sum([os.path.getsize(it) for it in hdf5_list])
+        #import pdb
+        #pdb.set_trace()
+        print('file size: {}'.format(si))
 
-    if si>7*10e9:
+        
+        if si>6.2*10e9:
+            nbinned = 1500
+            print('large file size, reducing nbinned')
+        else:
+            
+            nbinned = default_ops['nbinned']
+            #nbinned = 500
+    except:
         nbinned = 1500
-        print('large file size, reducing nbinned')
-    else:
-        nbinned = 5000
+    #import pdb
+    #pdb.set_trace()
     params = {
+        #tried playing around with sparse mode, but does not seem to work very well for my data so far
         'input_format': 'h5',
         'data_path': [str(f.parent) for f in hdf5_list],
         'save_path0': str(dirname_output),#+'v2',
@@ -365,18 +404,34 @@ def run_suite2p(hdf5_list, dirname_output, mdata,cellpose_ops={}):
         'do_bidiphase' : True,
         'spatial_hp': 50,
         'sparse_mode': False,
-        'threshold_scaling': 2., #default 4 #2 for 8saire
+        'threshold_scaling': 4.,#3.5, #default 4 #2 for 8saire
+        'spatial_scale': 4., # i think i should change it to 4
         'diameter': 8,
         'do_registration': 1,
         'nbinned':nbinned, #smaller nbinned, larger bin_size, smaller file #5000 orig
         'tau':1.,
         'roidetect': True,
+        'spikedetect':True,
+        'nonrigid': True,
+
     }
     params = {**params,**cellpose_ops}
     logger.info('Running suite2p on files:\n%s\n%s', '\n'.join(str(f) for f in hdf5_list), params)
     with open(dirname_output / 'recording_order.json', 'w') as fout:
         json.dump([str(e) for e in hdf5_list], fout, indent=4)
+    #first registration only. If it crashes, it is usually during roi detect bc of out of memory. THis way, all planes are registered at least:
+    params['roidetect']=False
     ops = suite2p.run_s2p(ops=default_ops, db=params)
+    #then roidetect
+    if len(cellpose_ops) > 0:
+        params['roidetect']=cellpose_ops['roidetect']
+    else:
+        params['roidetect']=1
+    import pdb
+    #pdb.set_trace()
+    params['do_registration']=0
+    ops = suite2p.run_s2p(ops=default_ops, db=params)
+
     import imageio
     import matplotlib.pyplot as plt
     dns = dirname_output / 'suite2p' / 'plane?' / 'ops.npy'
@@ -388,6 +443,15 @@ def run_suite2p(hdf5_list, dirname_output, mdata,cellpose_ops={}):
         plt.imsave(fn,meanImg,cmap='gray')
         fnt = fn.replace('.png','.tif')
         imageio.imwrite(fnt,np.uint16(meanImg))
+        try:
+            meanImg_chan2 = ops['meanImg_chan2']
+            fn = f.replace('ops.npy','meanImg_chan2.png')
+            plt.imsave(fn,meanImg_chan2,cmap='gray')
+            fnt = fn.replace('.png','.tif')
+            imageio.imwrite(fnt,np.uint16(meanImg_chan2))
+        except:
+            pass
+
 
 
 

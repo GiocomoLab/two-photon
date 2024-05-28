@@ -137,3 +137,4 @@ dmypy.json
 *.code-workspace
 two-photon/cmd_folder/archive/multiple_2021-08-13_16_55_45.bat
 two-photon/cmd_folder/archive/
+/two-photon/cmd_folder
