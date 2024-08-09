@@ -66,9 +66,9 @@ def get_bounds(df_voltage, frame_start, size, stim_channel_name, fname, buffer, 
 
 def get_start_stop(stim_start, stim_stop, frame_start, y_px, shape, settle_time):
     ix_start, y_off_start = get_loc(stim_start, frame_start, y_px, shape, settle_time)
-    y_off_start = np.floor(y_off_start).astype(np.int)
+    y_off_start = np.floor(y_off_start).astype(int)
     ix_stop, y_off_stop = get_loc(stim_stop, frame_start, y_px, shape, settle_time)
-    y_off_stop = np.ceil(y_off_stop).astype(np.int)
+    y_off_stop = np.ceil(y_off_stop).astype(int)
 
     frame = []
     z_plane = []
@@ -100,7 +100,7 @@ def get_loc(times, frame_start, y_px, shape, settle_time):
     """Determine the location of event times within the data, given the frame start times."""
     v_idx = times < frame_start.max() #valid starts
     interp = np.interp(times[v_idx], frame_start, range(len(frame_start))) #convert time to fractional frame
-    indices = interp.astype(np.int) #actual frame
+    indices = interp.astype(int) #actual frame
     idx = np.transpose(np.unravel_index(indices, shape)) #convert to cycle and plane
 
     frame_times = (frame_start[1:] - frame_start[:-1])
